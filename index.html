@@ -43,6 +43,26 @@
                 startPos = eventBalancer("mousedown", event);
             })
 
+            let textContent = "";
+            let timeRef;
+
+            mobileRef.addEventListener('keydown', function (event) {
+                const key = event.key;
+                textContent += key;
+                clearTimeout(timeRef);
+            });
+
+            mobileRef.addEventListener('keyup', function () {
+                timeRef = setTimeout(() => {
+                    if (textContent !== "Meta" && textContent !== "") {
+                        const finText = `idb ui text "${textContent}"`
+                        // console.log(finText);
+                        sendMessageWebsocketCOMMANDS(finText);
+                    }
+                    textContent = ""
+                }, 1000);
+            });
+
             mobileRef.addEventListener("mouseup", (event) => {
                 let endTime = Date.now();
                 if ((endTime - startTime) < 200) {
@@ -188,7 +208,7 @@
     Video<br />
     <div id="remoteVideos" style="background:none;height:1343px;width:640px;position: relative">
         <div style="width:100%;height: 100%;background: none;position: absolute; left: 0;top: 0;z-index: 3"
-            id="app_render">
+            id="app_render" tabindex="0">
         </div>
     </div>
     <br />
