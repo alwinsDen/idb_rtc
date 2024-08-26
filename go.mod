@@ -2,7 +2,10 @@ module webrtc_server
 
 go 1.21
 
-require github.com/pion/webrtc/v4 v4.0.0-beta.29
+require (
+	github.com/gorilla/websocket v1.5.3
+	github.com/pion/webrtc/v4 v4.0.0-beta.29
+)
 
 require (
 	github.com/google/uuid v1.6.0 // indirect

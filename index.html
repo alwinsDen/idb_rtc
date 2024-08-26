@@ -5,8 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC Viewer</title>
     <script>
-        /* eslint-env browser */
+        //this section deals with the web sockets for command
+        let socket;
+        function initWebSocket(){
+            socket = new WebSocket("ws://localhost:8080/ws");
+            socket.onopen = function (event){
+                console.log("Websocket connection opened: ",event);
+            }
+            socket.onmessage = function (event){
+                console.log('Message received from server:', event.data);
+            }
+            socket.onclose = function(event) {
+                console.log('WebSocket connection closed:', event);
+            };
+            socket.onerror = function(error) {
+                console.log('WebSocket error:', error);
+            };
+        }
 
+        function sendMessageWebsocket() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                console.log('Message sent:', message);
+                messageInput.value = '';
+            } else {
+                console.log('WebSocket connection is not open.');
+            }
+        }
+
+        window.onload = initWebSocket;
+
+        /* eslint-env browser */
         let pc = new RTCPeerConnection({
             iceServers: [
                 {
@@ -70,14 +102,11 @@
 
         window.sendMessage = () => {
             let message = document.getElementById('messageInput').value;
-            console.log("1",message);
             if (message === '') {
                 return alert('Message must not be empty');
             }
-            console.log("2",message);
             dataChannel.send(message);
             log(`Sent message: ${message}`);
-            console.log("3",message);
         }
 
     </script>
@@ -89,24 +118,35 @@
     </style>
 </head>
 <body>
-Browser base64 Session Description<br />
-<textarea id="localSessionDescription" readonly="true"></textarea> <br />
+Browser base64 Session Description<br/>
+<textarea id="localSessionDescription" readonly="true"></textarea> <br/>
 
-Golang base64 Session Description<br />
+Golang base64 Session Description<br/>
 <textarea id="remoteSessionDescription"> </textarea> <br/>
-<button onclick="window.startSession()"> Start Session </button><br />
+<button onclick="window.startSession()"> Start Session</button>
+<br/>
 
-<br />
+<br/>
 
-<br />
-Send a message to the server:<br />
-<input type="text" id="messageInput" placeholder="Type your message here">
-<button onclick="window.sendMessage()">Send Message</button><br />
+<br/>
+<!--Send a message to the server:<br/>-->
+<!--<input type="text" id="messageInput" placeholder="Type your message here">-->
+<!--<button onclick="window.sendMessage()">Send Message</button>-->
+<!--<br/>-->
 
-Video<br />
-<div id="remoteVideos" style="background:none;height:1280px;width:640px"></div> <br />
+Send a message to the server:<br/>
+<input type="text" id="messageInput" placeholder="Type a message">
+<button onclick="sendMessageWebsocket()">Send</button>
+<br/>
 
-Logs<br />
+Video<br/>
+<div id="remoteVideos" style="background:none;height:1343px;width:640px;position: relative">
+    <div style="width:100%;height: 100%;background: none;position: absolute; left: 0;top: 0">
+    </div>
+</div>
+<br/>
+
+Logs<br/>
 <div id="div"></div>
 
 </body>
