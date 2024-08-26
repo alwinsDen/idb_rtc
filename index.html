@@ -23,6 +23,49 @@
             };
         }
 
+        //this function controls the DOM part of the event listener
+        window.addEventListener("load",()=> {
+            const mobileRef = document.getElementById("app_render");
+            // const clickRef = document.getElementById("app_clicker");
+            let startTime = null;
+            let startPos = null;
+            function eventBalancer(stringName,event) {
+                const bbdBox = mobileRef.getBoundingClientRect();
+                const scaleX  = 393 / mobileRef.clientWidth;
+                const scaleY = 852 / mobileRef.clientHeight;
+                let x = (event.clientX - bbdBox.left)*scaleX;
+                let y = (event.clientY - bbdBox.top)*scaleY;
+                return {x, y}
+            }
+            mobileRef.addEventListener("mousedown", (event)=> {
+                startTime = Date.now();
+                startPos = eventBalancer("mousedown", event);
+            })
+
+            mobileRef.addEventListener("mouseup", (event)=> {
+                let endTime = Date.now();
+                if ((endTime - startTime) < 200) {
+                    const pressEvent = eventBalancer("click", event);
+                    let tap_command = `idb ui tap ${Math.round(pressEvent.x)} ${Math.round(pressEvent.y)}`
+                    sendMessageWebsocketCOMMANDS(tap_command);
+                    // clickRef.style.left = `${event.clientX}px`;
+                    // clickRef.style.top = `${event.clientY}px`;
+                } else {
+                    let endPos = eventBalancer("mouseup", event);
+                    let swipe_command = `idb ui swipe ${Math.round(startPos.x)} ${Math.round(startPos.y)} ${Math.round(endPos.x)} ${Math.round(endPos.y)} --duration ${(endTime - startTime)/1000}`
+                    sendMessageWebsocketCOMMANDS(swipe_command);
+                }
+            })
+        })
+
+        function sendMessageWebsocketCOMMANDS(message) {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+            } else {
+                console.log('WebSocket connection is not open.');
+            }
+        }
+
         function sendMessageWebsocket() {
             const messageInput = document.getElementById('messageInput');
             const message = messageInput.value;
@@ -36,7 +79,7 @@
             }
         }
 
-        window.onload = initWebSocket;
+        // window.onload = initWebSocket;
 
         /* eslint-env browser */
         let pc = new RTCPeerConnection({
@@ -70,7 +113,8 @@
         });
 
         dataChannel.onopen = () => {
-            console.log("DataChannel is open and ready to be used.");
+            console.log("DataChannel and websocket is open and ready to be used.");
+            initWebSocket();
         }
 
         dataChannel.onmessage = (event) => {
@@ -141,7 +185,7 @@ Send a message to the server:<br/>
 
 Video<br/>
 <div id="remoteVideos" style="background:none;height:1343px;width:640px;position: relative">
-    <div style="width:100%;height: 100%;background: none;position: absolute; left: 0;top: 0">
+    <div style="width:100%;height: 100%;background: none;position: absolute; left: 0;top: 0;z-index: 3" id="app_render">
     </div>
 </div>
 <br/>
